@@ -1,0 +1,377 @@
+{
+  "name": "CVE Scanner",
+  "nodes": [
+    {
+      "parameters": {
+        "chatId": "6203872441",
+        "text": "={{ $json.text }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2160,
+        -96
+      ],
+      "id": "89aaad48-9487-446d-8bca-a3ef4818280d",
+      "name": "Send a text message",
+      "webhookId": "69fade32-1f2d-436f-b4b8-34ceee54ddf2",
+      "credentials": {
+        "telegramApi": {
+          "id": "TB04RWq5t0ptiJrd",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://wid.cert-bund.de/content/public/securityAdvisory/rss",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        144,
+        -96
+      ],
+      "id": "bf866c72-bc5d-4ff3-8446-e686e181cb03",
+      "name": "Cert-Bund"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "*/5 * * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -80,
+        -96
+      ],
+      "id": "b6a74963-8c7b-4ca6-8cf9-e3cf644ace1b",
+      "name": "Schedule Trigger1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "dateTime": [
+            {
+              "value1": "={{ $now.minus({minutes: 5}).toISO() }}",
+              "operation": "before",
+              "value2": "={{ $json[\"isoDate\"] }}"
+            }
+          ]
+        }
+      },
+      "name": "Mehr als 5 min aussortieren",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        368,
+        -96
+      ],
+      "typeVersion": 1,
+      "id": "a58cb626-b1d8-4446-ace3-b58c03390402",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "kategorie",
+              "name": "kategorie",
+              "type": "string",
+              "value": "={{ String($json.category || ($json.categories && $json.categories[0]) || '').toLowerCase() }}"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "ff096e5f-768e-44bd-8a6d-26b96a937d3a",
+      "name": "Kategorie ermitteln",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        656,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "or",
+          "conditions": [
+            {
+              "id": "hoch",
+              "leftValue": "={{ $json.kategorie }}",
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              },
+              "rightValue": "hoch"
+            },
+            {
+              "id": "kritisch",
+              "leftValue": "={{ $json.kategorie }}",
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              },
+              "rightValue": "kritisch"
+            }
+          ],
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          }
+        },
+        "options": {}
+      },
+      "id": "11386756-11fd-4ab3-8963-b16d4caf0007",
+      "name": "Nur hoch / kritisch",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        880,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "datum",
+              "name": "datum",
+              "type": "string",
+              "value": "={{ $json.isoDate.toDateTime().setZone('Europe/Berlin').toFormat('dd.MM., HH:mm') }}"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "d2310fbc-c5ee-4389-bf14-443426de6fc9",
+      "name": "Datum formatieren",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1216,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "zeile",
+              "name": "zeile",
+              "type": "string",
+              "value": "=⚠️ [{{ $json.kategorie.toUpperCase() }}] {{ $json.title }}\n🕒 {{ $json.datum }}\n{{ $json.link }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9d351b10-049f-4106-b6ab-5cab3e829fb0",
+      "name": "Zeile bauen",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1440,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "fieldToAggregate": "zeile"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6e929c6d-d105-49d6-9d9f-5ec42574cfbe",
+      "name": "Zeilen sammeln",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1664,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "text",
+              "name": "text",
+              "type": "string",
+              "value": "=🚨 CERT-Bund Sicherheitswarnung:\n\n{{ $json.zeile.join('\\n\\n') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2aeaec04-5c28-4c83-b1a7-4a81d2e8a683",
+      "name": "Nachricht bauen",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1888,
+        -96
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Cert-Bund": {
+      "main": [
+        [
+          {
+            "node": "Mehr als 5 min aussortieren",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Cert-Bund",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mehr als 5 min aussortieren": {
+      "main": [
+        [
+          {
+            "node": "Kategorie ermitteln",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Kategorie ermitteln": {
+      "main": [
+        [
+          {
+            "node": "Nur hoch / kritisch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nur hoch / kritisch": {
+      "main": [
+        [
+          {
+            "node": "Datum formatieren",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Datum formatieren": {
+      "main": [
+        [
+          {
+            "node": "Zeile bauen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zeile bauen": {
+      "main": [
+        [
+          {
+            "node": "Zeilen sammeln",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zeilen sammeln": {
+      "main": [
+        [
+          {
+            "node": "Nachricht bauen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nachricht bauen": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "43749005-5818-4a40-a4d9-23b976cbae39",
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp",
+    "instanceId": "829b25e7df815f8ff7c668eb812e6f56b7446228d02c4c418e07d9aa7dec9ae8"
+  },
+  "nodeGroups": [
+    {
+      "id": "aa4c8f2a-835a-42a9-8de8-6968a8215662",
+      "name": "Schweregrad filtern",
+      "nodeIds": [
+        "ff096e5f-768e-44bd-8a6d-26b96a937d3a",
+        "11386756-11fd-4ab3-8963-b16d4caf0007"
+      ],
+      "description": "Liest die Kategorie der Warnung und lässt nur hoch und kritisch durch"
+    },
+    {
+      "id": "41e82253-da95-488d-a02c-57ba2fb66bac",
+      "name": "Telegram-Nachricht zusammenbauen",
+      "nodeIds": [
+        "d2310fbc-c5ee-4389-bf14-443426de6fc9",
+        "9d351b10-049f-4106-b6ab-5cab3e829fb0",
+        "6e929c6d-d105-49d6-9d9f-5ec42574cfbe",
+        "2aeaec04-5c28-4c83-b1a7-4a81d2e8a683"
+      ],
+      "description": "Formatiert Datum, baut pro Warnung eine Zeile und fügt alle zu einer Nachricht zusammen"
+    }
+  ],
+  "id": "TwEw7Ano0g2Z2mrw",
+  "tags": []
+}

@@ -1,0 +1,441 @@
+{
+  "name": "Heise AI",
+  "nodes": [
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "llama3.2:latest",
+          "mode": "list"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=  {{ $json.title }}\n\n  {{ $json.contentSnippet }}"
+            }
+          ]
+        },
+        "options": {
+          "system": "Du bist ein Nachrichten-Filter. Du bekommst einen Artikeltext.\nDeine einzigen Kriterien für \"wichtig\":\n- kritische Sicherheitslücken (z.B. CVEs, Zero-Days, Exploits, aktiv ausgenutzte Schwachstellen)\n- bedeutende KI-News (neue große KI-Modelle, große Durchbrüche, relevante KI-Regulierung)\n\nBeispiele:\n\"GitLab-Server sind für Schadcode-Attacken anfällig\" → 1\n\"Stirling PDF macht aus 10.000 PDFs einen Job\" → 0\n\"Claude Opus 5.5 veröffentlicht\" → 1\n\"Neue Kopfhörer im Test\" → 0\n\nAntworte AUSSCHLIESSLICH mit einer einzigen Ziffer: 1 (wichtig) oder 0 (unwichtig).\nKeine Erklärung, kein Text, keine Satzzeichen. Nur die Ziffer.",
+          "temperature": 0,
+          "seed": 42
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.ollama",
+      "typeVersion": 1,
+      "position": [
+        736,
+        0
+      ],
+      "id": "d2150820-db1f-4fb2-bbef-a469ba3c86bd",
+      "name": "Message a model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "p0D28dJIzJZ7GTeF",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "2bcb2623-8785-44da-9f1c-43f8b82b0176",
+              "leftValue": "={{ $json.wichtig }}",
+              "rightValue": "1",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        1312,
+        0
+      ],
+      "id": "a213385f-f09b-4865-8936-a107c8dbb442",
+      "name": "Filter"
+    },
+    {
+      "parameters": {
+        "chatId": "6203872441",
+        "text": "={{ $json.text }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2592,
+        0
+      ],
+      "id": "fb15ad46-b4dc-4279-a916-d4c05a7dfa61",
+      "name": "Send a text message",
+      "webhookId": "69fade32-1f2d-436f-b4b8-34ceee54ddf2",
+      "credentials": {
+        "telegramApi": {
+          "id": "TB04RWq5t0ptiJrd",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://www.heise.de/rss/heise-atom.xml",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "2d17fd9d-0ea9-43d7-acd4-6db3c20c9471",
+      "name": "RSS Read"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "dateTime": [
+            {
+              "value1": "={{ $now.minus({minutes: 30}).toISO() }}",
+              "operation": "before",
+              "value2": "={{ $json[\"isoDate\"] }}"
+            }
+          ]
+        }
+      },
+      "name": "Mehr als 30 min aussortieren",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        448,
+        0
+      ],
+      "typeVersion": 1,
+      "id": "af68ec04-1c4a-4d7b-9ea1-9805e62a2d82",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0,30 * * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "ca7669c0-e52a-4037-bb6f-624ca6086c8d",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "title",
+              "name": "title",
+              "type": "string",
+              "value": "={{ $('Mehr als 30 min aussortieren').item.json.title }}"
+            },
+            {
+              "id": "link",
+              "name": "link",
+              "type": "string",
+              "value": "={{ $('Mehr als 30 min aussortieren').item.json.link }}"
+            },
+            {
+              "id": "isoDate",
+              "name": "isoDate",
+              "type": "string",
+              "value": "={{ $('Mehr als 30 min aussortieren').item.json.isoDate }}"
+            },
+            {
+              "id": "contentSnippet",
+              "name": "contentSnippet",
+              "type": "string",
+              "value": "={{ $('Mehr als 30 min aussortieren').item.json.contentSnippet }}"
+            },
+            {
+              "id": "wichtig",
+              "name": "wichtig",
+              "type": "string",
+              "value": "={{ String($json.content ?? '').trim().startsWith('1') ? '1' : '0' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6058ee3e-762b-4848-98b8-71e321962ea1",
+      "name": "Bewertung übernehmen",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1088,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "datum",
+              "name": "datum",
+              "type": "string",
+              "value": "={{ $json.isoDate.toDateTime().setZone('Europe/Berlin').toFormat('dd.MM., HH:mm') }}"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "1fab2daf-45c9-452e-ba59-509c9d167c2c",
+      "name": "Datum formatieren",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1648,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "zeile",
+              "name": "zeile",
+              "type": "string",
+              "value": "=🕒 {{ $json.datum }}\n{{ $json.title }}\n{{ $json.link }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2fbeccc8-e3e1-468f-ba3e-494a23662a15",
+      "name": "Zeile bauen",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1872,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "fieldToAggregate": "zeile"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "15d9455e-b289-48f5-967b-df4132f3cda5",
+      "name": "Zeilen sammeln",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        2096,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "text",
+              "name": "text",
+              "type": "string",
+              "value": "=📰 Wichtige Artikel:\n\n{{ $json.zeile.join('\\n\\n') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "cc340703-d69a-42f1-8559-3584775ce207",
+      "name": "Nachricht bauen",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2320,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "RSS Read": {
+      "main": [
+        [
+          {
+            "node": "Mehr als 30 min aussortieren",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mehr als 30 min aussortieren": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "RSS Read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Bewertung übernehmen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bewertung übernehmen": {
+      "main": [
+        [
+          {
+            "node": "Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter": {
+      "main": [
+        [
+          {
+            "node": "Datum formatieren",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Datum formatieren": {
+      "main": [
+        [
+          {
+            "node": "Zeile bauen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zeile bauen": {
+      "main": [
+        [
+          {
+            "node": "Zeilen sammeln",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zeilen sammeln": {
+      "main": [
+        [
+          {
+            "node": "Nachricht bauen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nachricht bauen": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "3f6e0282-1be9-4c62-b6b8-7c6ce0bcb78a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp",
+    "instanceId": "829b25e7df815f8ff7c668eb812e6f56b7446228d02c4c418e07d9aa7dec9ae8"
+  },
+  "nodeGroups": [
+    {
+      "id": "11d4b176-f7d6-4a0a-905c-c0ce65f519e8",
+      "name": "KI-Bewertung",
+      "nodeIds": [
+        "d2150820-db1f-4fb2-bbef-a469ba3c86bd",
+        "6058ee3e-762b-4848-98b8-71e321962ea1",
+        "a213385f-f09b-4865-8936-a107c8dbb442"
+      ],
+      "description": "Llama bewertet jeden Artikel mit 1/0, nur wichtige Artikel bleiben übrig"
+    },
+    {
+      "id": "b2efe59e-383c-4f79-9adf-05bcd2004c30",
+      "name": "Telegram-Nachricht zusammenbauen",
+      "nodeIds": [
+        "1fab2daf-45c9-452e-ba59-509c9d167c2c",
+        "2fbeccc8-e3e1-468f-ba3e-494a23662a15",
+        "15d9455e-b289-48f5-967b-df4132f3cda5",
+        "cc340703-d69a-42f1-8559-3584775ce207"
+      ],
+      "description": "Formatiert Datum, baut pro Artikel eine Zeile und fügt alle zu einer Nachricht zusammen"
+    }
+  ],
+  "id": "pVnKzplDagay3n1r",
+  "tags": []
+}
