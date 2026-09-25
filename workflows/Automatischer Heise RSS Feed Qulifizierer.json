@@ -1,0 +1,411 @@
+{
+  "name": "Automatischer Heise RSS Feed Qulifizierer",
+  "nodes": [
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "llama3.2:latest",
+          "mode": "list",
+          "cachedResultName": "llama3.2:latest"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=  {{ $json.title }}\n\n  {{ $json.contentSnippet }}"
+            }
+          ]
+        },
+        "options": {
+          "system": "Du bist ein Nachrichten-Filter. Du bekommst einen Artikeltext.\nDeine einzigen Kriterien für \"wichtig\":\n- kritische Sicherheitslücken (z.B. CVEs, Zero-Days, Exploits, aktiv ausgenutzte Schwachstellen)\n- bedeutende KI-News (neue große KI-Modelle, große Durchbrüche, relevante KI-Regulierung)\n\nBeispiele:\n\"GitLab-Server sind für Schadcode-Attacken anfällig\" → 1\n\"Stirling PDF macht aus 10.000 PDFs einen Job\" → 0\n\"Claude Opus 5.5 veröffentlicht\" → 1\n\"Neue Kopfhörer im Test\" → 0\n\nAntworte AUSSCHLIESSLICH mit einer einzigen Ziffer: 1 (wichtig) oder 0 (unwichtig).\nKeine Erklärung, kein Text, keine Satzzeichen. Nur die Ziffer.",
+          "temperature": 0,
+          "seed": 42
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.ollama",
+      "typeVersion": 1,
+      "position": [
+        912,
+        -256
+      ],
+      "id": "326e50a1-b426-4508-9959-a3bb8a868b2f",
+      "name": "Message a model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "8iABaVYu4jbgDgm2",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "2bcb2623-8785-44da-9f1c-43f8b82b0176",
+              "leftValue": "={{ $json.wichtig }}",
+              "rightValue": "1",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        1488,
+        -256
+      ],
+      "id": "e8fb7dcf-9895-4995-bd39-98007176daf7",
+      "name": "Filter"
+    },
+    {
+      "parameters": {
+        "chatId": "6203872441",
+        "text": "={{ $json.text }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1936,
+        -160
+      ],
+      "id": "eaa62cfd-957c-4ff6-a847-8fb815db51e4",
+      "name": "Send a text message",
+      "webhookId": "69fade32-1f2d-436f-b4b8-34ceee54ddf2",
+      "credentials": {
+        "telegramApi": {
+          "id": "pcUX5fAUaR5KDAEl",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const alleItems = $input.all();\n\nlet text = \"📰 Wichtige Artikel:\\n\\n\";\nfor (const item of alleItems) {\n  const datum = new Date(item.json.pubDate).toLocaleString('de-DE', {\n    timeZone: 'Europe/Berlin',\n    day: '2-digit',\n    month: '2-digit',\n    hour: '2-digit',\n    minute: '2-digit'\n  });\n  text += `🕒 ${datum}\\n${item.json.title}\\n${item.json.link}\\n\\n`;\n}\n\nreturn [{ json: { text } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1712,
+        -256
+      ],
+      "id": "4f0259e1-c79a-451f-aba9-5b76116371ca",
+      "name": "In Nachricht verpacken"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item, index) => {\n  const raw = String(item.json.content).trim();\n  const original = $('Mehr als 30 min aussortieren').all()[index].json;\n  return {\n    json: {\n      title: original.title,\n      link: original.link,\n      pubDate: original.pubDate,\n      contentSnippet: original.contentSnippet,\n      wichtig: raw.startsWith(\"1\") ? 1 : 0\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1264,
+        -256
+      ],
+      "id": "ee6f22bf-543d-42bd-a954-5ce4a9e5d13a",
+      "name": "Klassifizierung dem Artikel zuordnen"
+    },
+    {
+      "parameters": {
+        "url": "https://www.heise.de/rss/heise-atom.xml",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        464,
+        -256
+      ],
+      "id": "806e036e-c7bf-4294-bfee-0c58523217fc",
+      "name": "RSS Read"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "dateTime": [
+            {
+              "value1": "={{ $now.minus({minutes: 30}).toISO() }}",
+              "operation": "before",
+              "value2": "={{ $json[\"isoDate\"] }}"
+            }
+          ]
+        }
+      },
+      "name": "Mehr als 30 min aussortieren",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        688,
+        -256
+      ],
+      "typeVersion": 1,
+      "id": "96bf8a33-51f7-4977-9d56-257916651c42",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0,30 * * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        240,
+        -256
+      ],
+      "id": "5aa480c3-1c07-4a4d-b91b-ef3ea2a916cb",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "url": "https://wid.cert-bund.de/content/public/securityAdvisory/rss",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        976,
+        -64
+      ],
+      "id": "14ba80af-1aa9-4704-8e06-dd4a67dcd246",
+      "name": "Cert-Bund"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "*/5 * * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        688,
+        -64
+      ],
+      "id": "1c0fa154-5c52-466c-8d9e-fe4c1a2dc3ec",
+      "name": "Schedule Trigger1"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.filter(item => {\n  const kategorie = (item.json.category || (item.json.categories && item.json.categories[0]) || '').toLowerCase();\n  return ['hoch', 'kritisch'].includes(kategorie);\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1488,
+        -64
+      ],
+      "id": "86a56ad9-1f77-48f7-918e-1757d6b91747",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "jsCode": "const alleItems = $input.all();\nif (alleItems.length === 0) return [];\n\nlet text = \"🚨 CERT-Bund Sicherheitswarnung:\\n\\n\";\nfor (const item of alleItems) {\n  const datum = new Date(item.json.pubDate).toLocaleString('de-DE', {\n    timeZone: 'Europe/Berlin',\n    day: '2-digit',\n    month: '2-digit',\n    hour: '2-digit',\n    minute: '2-digit'\n  });\n  const kategorie = item.json.category || (item.json.categories && item.json.categories[0]) || 'unbekannt';\n  text += `⚠️ [${kategorie.toUpperCase()}] ${item.json.title}\\n🕒 ${datum}\\n${item.json.link}\\n\\n`;\n}\n\nreturn [{ json: { text } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1712,
+        -64
+      ],
+      "id": "15639618-91c5-41f5-a786-36d43fa42c1a",
+      "name": "In Nachricht verpacken1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "dateTime": [
+            {
+              "value1": "={{ $now.minus({minutes: 5}).toISO() }}",
+              "operation": "before",
+              "value2": "={{ $json[\"isoDate\"] }}"
+            }
+          ]
+        }
+      },
+      "name": "Mehr als 5 min aussortieren",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1264,
+        -64
+      ],
+      "typeVersion": 1,
+      "id": "05c6492d-ca18-4c8f-a550-b5ec4091e87a",
+      "continueOnFail": true
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Klassifizierung dem Artikel zuordnen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter": {
+      "main": [
+        [
+          {
+            "node": "In Nachricht verpacken",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "In Nachricht verpacken": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Klassifizierung dem Artikel zuordnen": {
+      "main": [
+        [
+          {
+            "node": "Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Read": {
+      "main": [
+        [
+          {
+            "node": "Mehr als 30 min aussortieren",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mehr als 30 min aussortieren": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "RSS Read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Cert-Bund",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cert-Bund": {
+      "main": [
+        [
+          {
+            "node": "Mehr als 5 min aussortieren",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "In Nachricht verpacken1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "In Nachricht verpacken1": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mehr als 5 min aussortieren": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "c599abc8-eb4b-426a-883e-17ca11aabfc1",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b88da10a79d9247babb9516054b59821ab53a5ec615883faafbc242bef9a0207"
+  },
+  "nodeGroups": [],
+  "id": "k2bz73KGhbuwRpnd",
+  "tags": []
+}
