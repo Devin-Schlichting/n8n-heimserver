@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   n8n-db:
     image: postgres:16
@@ -18,14 +16,6 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-
   n8n:
     image: docker.n8n.io/n8nio/n8n
     restart: unless-stopped
